@@ -36,27 +36,66 @@ const sceneConfig = {
             sceneObjects = [];
             let x = canvas.width/2;
             while (x < canvas.width) {
-                const w = 20 + Math.random() * 30;
-                const h = 30 + Math.random() * 50;
+                const w = 25 + Math.random() * 30; // Slightly wider buildings for windows
+                const h = 40 + Math.random() * 60; // Taller buildings
                 sceneObjects.push({ x: x, w: w, h: h, type: 'building' });
-                x += w; // Stack them next to each other
+                x += w - 2; // Overlap slightly (-2) to avoid gaps
             }
         },
         draw: (ctx, groundY, theme) => {
-            // Draw Buildings (Silhouettes)
-            ctx.fillStyle = theme.sunVisible ? "#2a2a2a" : "#000"; // Dark grey day, black night
+            // 1. Draw Buildings (Silhouettes)
+            // Day: Dark Grey | Night: Black
+            const bldgColor = theme.sunVisible ? "#2a2a2a" : "#050505";
+            
             sceneObjects.forEach(b => {
+                ctx.fillStyle = bldgColor;
                 ctx.fillRect(b.x, groundY - b.h, b.w, b.h);
                 
-                // Add Windows (Yellow at night)
-                if (!theme.sunVisible) {
-                    ctx.fillStyle = "#aa5"; // Dim yellow light
-                    // Draw a random window pattern (simplified)
-                    if (b.x % 3 === 0) ctx.fillRect(b.x + 5, groundY - b.h + 10, 4, 4);
-                    ctx.fillStyle = "#000"; // Reset to building color
+                // --- WINDOW GENERATION ---
+                const winW = 4; // Window Width
+                const winH = 6; // Window Height
+                const gap = 4;  // Space between windows
+                
+                // Calculate columns and rows based on building size
+                const cols = Math.floor((b.w - gap) / (winW + gap));
+                const rows = Math.floor((b.h - gap) / (winH + gap));
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        
+                        // Pseudo-random check: Should this window be lit?
+                        // We use the coordinates to create a stable "random" pattern that doesn't flicker
+                        const isLit = Math.sin(b.x * r * c) > 0.5; // 70% of lights on
+
+                        // COLOR LOGIC
+                        if (theme.sunVisible) {
+                            // DAY: Windows reflect the sky (Use theme.sky)
+                            ctx.fillStyle = theme.sky; 
+                        } else {
+                            // NIGHT: Lights are Yellow (if lit), otherwise dark grey
+                            // We lower the opacity slightly so they aren't blindingly bright
+                            ctx.fillStyle = isLit ? "#F0E68C" : "#1a1a1a"; 
+                        }
+
+                        // Coordinates for this specific window
+                        const wx = b.x + gap + c * (winW + gap);
+                        const wy = (groundY - b.h) + gap + r * (winH + gap);
+
+                        // Draw Window Pane
+                        ctx.fillRect(wx, wy, winW, winH);
+
+                        // DRAW GLEAM (The shiny glass reflection)
+                        // A simple diagonal white line with transparency
+                        if (theme.sunVisible || isLit) {
+                            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+                            ctx.fillRect(wx, wy, 1, 1);       // Top-left pixel
+                            ctx.fillRect(wx + 1, wy + 1, 1, 1); // Diagonal pixel
+                        }
+                    }
                 }
             });
-            // Draw Road
+
+            // 2. Draw Road
             ctx.fillStyle = theme.ground;
             ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
         }
@@ -490,6 +529,8 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 });
 
 // START
+// FORCE UI SYNC: Ensure the dropdown matches the default 'pasture' variable
+document.getElementById('scene-select').value = currentScene;
 resize(); // Call resize immediately to set initial vars
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(p => fetchWeather(p.coords.latitude, p.coords.longitude), 
