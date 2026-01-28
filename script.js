@@ -331,7 +331,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
     const statusText = document.getElementById('status-msg').innerText;
     let shareText = "Check out this Pixel Weather Window!";
     
-    // If we have a city loaded (e.g., "Success: Tokyo, JP"), use it
+    // If we have a city loaded, use it
     if (statusText.includes("Success:")) {
         const city = statusText.replace("Success: ", "");
         shareText = `Check out the current weather in ${city} in pixel art!`;
@@ -340,29 +340,55 @@ document.getElementById('share-btn').addEventListener('click', async () => {
     const shareData = {
         title: 'Pixel Weather Window',
         text: shareText,
-        url: window.location.href // The link to your GitHub page
+        url: window.location.href
     };
 
-    // 2. Try to use the native "Share" menu (Mobile/Modern Browsers)
+    // 2. Try native Share (Mobile/Tablets)
     if (navigator.share) {
         try {
             await navigator.share(shareData);
+            return; // If share works, stop here
         } catch (err) {
-            console.log('Share canceled:', err);
-        }
-    } else {
-        // 3. Fallback for Desktop: Copy URL to clipboard
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            // Temporarily change button text to show success
-            const btn = document.getElementById('share-btn');
-            const originalText = btn.innerText;
-            btn.innerText = "✅";
-            setTimeout(() => btn.innerText = originalText, 2000);
-        } catch (err) {
-            alert("Could not copy link. Manually copy the URL from the bar!");
+            console.log('Share canceled or failed, trying clipboard...', err);
+            // If share fails, fall through to clipboard logic below
         }
     }
+
+    // 3. Clipboard Logic (Desktop/Fallback)
+    try {
+        // Method A: Modern API (Requires HTTPS)
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(window.location.href);
+        } else {
+            throw new Error("Clipboard API unavailable");
+        }
+    } catch (err) {
+        // Method B: Legacy Fallback (Works on HTTP/Older browsers)
+        const textArea = document.createElement("textarea");
+        textArea.value = window.location.href;
+        
+        // Ensure it's not visible but part of the DOM
+        textArea.style.position = "fixed"; 
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            document.execCommand('copy');
+        } catch (e) {
+            alert("Could not copy link automatically. Please copy from the address bar.");
+            document.body.removeChild(textArea);
+            return;
+        }
+        document.body.removeChild(textArea);
+    }
+
+    // 4. Visual Feedback (Show ✅)
+    const btn = document.getElementById('share-btn');
+    const originalText = btn.innerText;
+    btn.innerText = "✅";
+    setTimeout(() => btn.innerText = originalText, 2000);
 });
 
 // START
