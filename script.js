@@ -1,28 +1,49 @@
 const canvas = document.getElementById('pixel-canvas');
 const ctx = canvas.getContext('2d');
 
-let weather = { 
-    clouds: 0, 
-    windSpeed: 0, 
-    loaded: false, 
-    timezoneOffset: 0 // New: difference in seconds from UTC
-};
+let weather = { clouds: 0, windSpeed: 0, loaded: false, timezoneOffset: 0 };
 let cloudOffset = 0;
+
+// --- DYNAMIC RESOLUTION SETTINGS ---
+const pixelScale = 4; // 1 "Canvas Pixel" = 4 "Screen Pixels" (Lower = sharper, Higher = blockier)
+
+function resize() {
+    // 1. Get the real screen size
+    const displayWidth = window.innerWidth;
+    const displayHeight = window.innerHeight;
+
+    // 2. Set the internal "Game Resolution" (Screen size divided by scale)
+    canvas.width = Math.ceil(displayWidth / pixelScale);
+    canvas.height = Math.ceil(displayHeight / pixelScale);
+    
+    // 3. Regenerate stars to fill new size
+    initStars(); 
+}
+
+// Listen for window resize events
+window.addEventListener('resize', resize);
+
 // --- FPS CONTROL ---
-let fps = 5; // Set to 12 or 15 for a retro feel
+let fps = 5; 
 let fpsInterval = 1000 / fps;
 let then = Date.now();
 
-const stars = [];
+// --- STARS LOGIC (Refactored to a function) ---
+let stars = [];
 const numStars = 100;
 
-// Generate stars once at the start
-for (let i = 0; i < numStars; i++) {
-    stars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * 170, // Keep stars above the grass line
-        size: Math.random() > 0.8 ? 2 : 1 // Some stars are 2x2 pixels
-    });
+function initStars() {
+    stars = [];
+    // Dynamic Horizon: We'll put grass at the bottom 30 pixels
+    const horizon = canvas.height - 30; 
+    
+    for (let i = 0; i < numStars; i++) {
+        stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * horizon, 
+            size: Math.random() > 0.8 ? 2 : 1 
+        });
+    }
 }
 
 // --- 1. TIME & COLOR LOGIC ---
@@ -151,58 +172,62 @@ function draw() {
         if (!weather.loaded) {
             ctx.fillStyle = "#111";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else {
+} else {
+            // RELATIVE COORDINATES
+            const grassHeight = 30;
+            const horizon = canvas.height - grassHeight;
+            
             // 1. Draw Sky
             ctx.fillStyle = theme.sky;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Stars
             if (!theme.sunVisible) {
                 ctx.fillStyle = "white";
-                // We can even make them "twinkle" by using the theme.hour
                 stars.forEach((star, index) => {
-                    // Simple twinkle: hide a star occasionally based on index and time
-                    if ((Math.sin(Date.now() * 0.001 + index) > -0.5)) {
-                        ctx.fillRect(star.x, star.y, star.size, star.size);
+                    // Only draw stars if they are still within the sky area
+                    if (star.y < horizon) { 
+                        if ((Math.sin(Date.now() * 0.001 + index) > -0.5)) {
+                            ctx.fillRect(star.x, star.y, star.size, star.size);
+                        }
                     }
                 });
             }
-            // 2. Solar Arc Math (Fixed for visibility)
-            //const angle = ((theme.hour-6) / 24) * Math.PI * 2 ;
-            //let angle_final = angle;
-            //if (angle > Math.PI) let angle_final = angle - Math.PI  ;
-            //const sunX = Math.cos(angle) * 150 + 20;
-            //const sunY =  Math.sin(angle) * 120 ;
-            //const sunX = 150 - Math.cos(angle_final) * 130 ;
-            //const sunY = 150 - Math.sin(angle_final) * 100 ;
+
+            // 2. Solar Arc Logic
             let shiftedHour = (theme.hour - 6);
-            if (shiftedHour < 0) shiftedHour += 24; // Handle hours before 6 AM
-
-            // 2. Use modulo 12 so that 6 AM - 6 PM AND 6 PM - 6 AM both result in 0 - 12
+            if (shiftedHour < 0) shiftedHour += 24;
             const cycleHour = shiftedHour % 12;
-
-            // 3. Map 0-12 hours to 0 to PI (180 degrees)
-            // At 0h (6 AM), angle is 0. At 6h (Noon), angle is PI/2. At 12h (6 PM), angle is PI.
             const angle_final = (cycleHour / 12) * Math.PI;
 
-            // 4. Calculate Coordinates
-            // We use canvas.width/2 to center it. 
-            // We SUBTRACT Sin because in Canvas, Y increases as you go DOWN. 
-            // To go UP into the sky, we need to subtract.
-            const sunX = (canvas.width / 2) - Math.cos(angle_final) * 130;
-            const sunY = 170 - Math.sin(angle_final) * 100; // 170 is the grass line
+            // DYNAMIC SUN POSITION
+            // X: Center of screen
+            // Y: Horizon line (minus offset to move up/down)
+            const sunX = (canvas.width / 2) - Math.cos(angle_final) * (canvas.width * 0.4); // Radius is 40% of screen width
+            const sunY = horizon - Math.sin(angle_final) * (canvas.height * 0.6); // Height of arc depends on screen height
+
             ctx.fillStyle = theme.sunVisible ? "#FFD700" : "#F0EAD6";
+            // Make Sun size relative too? Or keep fixed? Fixed is usually fine for pixel art.
             ctx.fillRect(sunX, sunY, 20, 20);
 
             // 3. Clouds
             ctx.fillStyle = "rgba(255,255,255,0.4)";
-            cloudOffset += (weather.windSpeed * 0.1); // Increased speed slightly for the 15fps look
-            for (let i = 0; i < (weather.clouds / 10) + 1; i++) {
-                let x = (i * 80 + cloudOffset) % (canvas.width + 60) - 60;
-                ctx.fillRect(x, 50 + (i % 3 * 15), 40, 10);
+            cloudOffset += (weather.windSpeed * 0.03); 
+            
+            // Calculate how many clouds we need based on width
+            const cloudDensity = Math.floor(canvas.width / 30); // 1 cloud every 30px
+            const activeClouds = Math.min(cloudDensity, Math.floor(weather.clouds / 5) + 2);
+
+            for (let i = 0; i < activeClouds; i++) {
+                // Wrap clouds around the new dynamic width
+                let x = (i * (canvas.width / activeClouds) + cloudOffset) % (canvas.width + 60) - 60;
+                let y = (canvas.height * 0.1) + (i % 3 * 15); // Clouds in top 10-30% of screen
+                ctx.fillRect(x, y, 40, 10);
             }
 
             // 4. Grass
             ctx.fillStyle = theme.grass;
-            ctx.fillRect(0, 170, canvas.width, 30);
+            ctx.fillRect(0, horizon, canvas.width, grassHeight);
         }
         console.log("Local Hour at City:", theme.hour.toFixed(2), "Windspeed:", weather.windSpeed);
     }
@@ -216,4 +241,5 @@ document.getElementById('search-btn').addEventListener('click', () => {
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(p => fetchWeather(p.coords.latitude, p.coords.longitude), () => fetchWeather(51.5, 0));
 }
+resize(); // Set size and generate stars
 draw();
