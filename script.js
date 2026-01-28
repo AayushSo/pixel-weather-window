@@ -4,6 +4,85 @@ const ctx = canvas.getContext('2d');
 let weather = { clouds: 0, windSpeed: 0, loaded: false, timezoneOffset: 0 };
 let cloudOffset = 0;
 
+// Auto scene
+
+let currentScene = 'pasture';
+let sceneObjects = []; // Will hold trees, buildings, etc.
+
+const sceneConfig = {
+    pasture: {
+        groundHeight: 0.15, // 15% of screen
+        colors: { day: "#228b22", night: "#050d05" },
+        init: () => {
+            // Generate Trees
+            sceneObjects = [
+                { x: canvas.width * 0.15, height: 25, type: 'tree' },
+                { x: canvas.width * 0.80, height: 20, type: 'tree' }
+            ];
+        },
+        draw: (ctx, groundY, theme) => {
+            // Draw Trees
+            sceneObjects.forEach(obj => drawTree(obj, groundY));
+            // Draw Grass
+            ctx.fillStyle = theme.ground;
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+        }
+    },
+    city: {
+        groundHeight: 0.10, // 10% (Road)
+        colors: { day: "#555555", night: "#111111" },
+        init: () => {
+            // Generate Skyline (Random Buildings)
+            sceneObjects = [];
+            let x = 0;
+            while (x < canvas.width) {
+                const w = 20 + Math.random() * 30;
+                const h = 30 + Math.random() * 50;
+                sceneObjects.push({ x: x, w: w, h: h, type: 'building' });
+                x += w; // Stack them next to each other
+            }
+        },
+        draw: (ctx, groundY, theme) => {
+            // Draw Buildings (Silhouettes)
+            ctx.fillStyle = theme.sunVisible ? "#2a2a2a" : "#000"; // Dark grey day, black night
+            sceneObjects.forEach(b => {
+                ctx.fillRect(b.x, groundY - b.h, b.w, b.h);
+                
+                // Add Windows (Yellow at night)
+                if (!theme.sunVisible) {
+                    ctx.fillStyle = "#aa5"; // Dim yellow light
+                    // Draw a random window pattern (simplified)
+                    if (b.x % 3 === 0) ctx.fillRect(b.x + 5, groundY - b.h + 10, 4, 4);
+                    ctx.fillStyle = "#000"; // Reset to building color
+                }
+            });
+            // Draw Road
+            ctx.fillStyle = theme.ground;
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+        }
+    },
+    beach: {
+        groundHeight: 0.25, // More ground (Sand + Water)
+        colors: { day: "#eecfa1", night: "#4b3d2a" }, // Sand colors
+        init: () => {
+            // Single Palm Tree
+            sceneObjects = [{ x: canvas.width * 0.7, height: 40, type: 'palm' }];
+        },
+        draw: (ctx, groundY, theme) => {
+            // Draw Ocean (Horizon line)
+            const waterColor = theme.sunVisible ? "#1da2d8" : "#0f2d40";
+            ctx.fillStyle = waterColor;
+            ctx.fillRect(0, groundY - 10, canvas.width, 10); // Water strip above sand
+            
+            // Draw Palm Tree (Reuse tree logic or custom)
+            sceneObjects.forEach(obj => drawTree(obj, groundY)); // Use basic tree for now or tweak
+            
+            // Draw Sand
+            ctx.fillStyle = theme.ground;
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+        }
+    }
+};
 // --- DYNAMIC RESOLUTION SETTINGS ---
 const pixelScale = 4; 
 
@@ -16,6 +95,7 @@ function resize() {
     canvas.height = Math.ceil(displayHeight / pixelScale);
     
     initStars(); 
+    sceneConfig[currentScene].init();
 }
 window.addEventListener('resize', resize);
 
@@ -107,34 +187,50 @@ function getSkyTheme() {
     const localTime = new Date(utcTimestamp + (weather.timezoneOffset * 1000));
     const hour = localTime.getHours() + localTime.getMinutes() / 60;
 
+    // --- EXPANDED THEMES ARRAY ---
+    // We add "guard rows" (e.g., 5.0 and 7.0) to lock colors in place
+    // so they don't fade continuously.
     const themes = [
-        { hr: 0,   sky: "#05050a", grass: "#050d05", sun: false },
-        { hr: 6,   sky: "#ff7e5f", grass: "#228b22", sun: true },
-        { hr: 12,  sky: "#87ceeb", grass: "#32cd32", sun: true },
-        { hr: 18,  sky: "#feb47b", grass: "#228b22", sun: true },
-        { hr: 24,  sky: "#05050a", grass: "#050d05", sun: false }
+        { hr: 0,   sky: "#05050a", sun: false }, // Midnight (Dark)
+        { hr: 5,   sky: "#05050a", sun: false }, // 5 AM (Still Dark - No change since midnight)
+        { hr: 6,   sky: "#ff7e5f", sun: true },  // 6 AM (Sunrise - Orange)
+        { hr: 7,   sky: "#87ceeb", sun: true },  // 7 AM (Day Blue - Rapid fade from Orange)
+        { hr: 12,  sky: "#87ceeb", sun: true },  // Noon (Day Blue - No change since 7 AM)
+        { hr: 17,  sky: "#87ceeb", sun: true },  // 5 PM (Day Blue - Start of sunset soon)
+        { hr: 18,  sky: "#feb47b", sun: true },  // 6 PM (Sunset - Orange)
+        { hr: 19,  sky: "#05050a", sun: false }, // 7 PM (Night - Rapid fade to Dark)
+        { hr: 24,  sky: "#05050a", sun: false }  // Midnight (Dark)
     ];
 
+    // Find the correct time slot
     let i = 0;
     while (i < themes.length - 1 && hour > themes[i + 1].hr) i++;
     const start = themes[i];
     const end = themes[i + 1];
+    
+    // Calculate progress between these two specific timestamps
     const factor = (hour - start.hr) / (end.hr - start.hr);
+
+    // 1. GET CURRENT SCENE DATA
+    const sceneColors = sceneConfig[currentScene].colors;
 
     let theme = {
         sky: lerpColor(start.sky, end.sky, factor),
-        grass: lerpColor(start.grass, end.grass, factor),
+        
+        // 2. DYNAMIC GROUND COLOR
+        // Use Day color if sun is visible, otherwise Night color
+        ground: start.sun ? sceneColors.day : sceneColors.night,
+        
         sunVisible: start.sun,
-        hour: hour
+        hour: hour,
+        overcast: false
     };
-    // --- OVERCAST OVERRIDE ---
-    theme.overcast = false; // Default to clear skies
-    // --- OVERCAST OVERRIDE ---
+
+    // 3. WEATHER OVERRIDES
     if (weather.isRaining || weather.isSnowing) {
         theme.sky = "#4a525a";      // Slate Grey Sky
-        theme.grass = "#1e2b1e";    // Darker/Wet Grass
-        theme.overcast = true;      // New Flag: It's cloudy!
-        // REMOVED: theme.sunVisible = false; <--- This was causing the bug
+        theme.ground = sceneColors.night; // Wet/Dark ground
+        theme.overcast = true;      // Hide sun/moon
     }
 
     return theme;
@@ -240,6 +336,9 @@ function draw() {
 
             // 3. Sun/Moon Arc
             // Draw only if Sky is Clear (Not Overcast)
+            const groundHeight = canvas.height * sceneConfig[currentScene].groundHeight;
+            const groundY = canvas.height - groundHeight;
+            
             if (!theme.overcast) {
                 // We use relative radius based on screen width
                 const arcRadiusX = canvas.width * 0.4;
@@ -268,13 +367,10 @@ function draw() {
                 ctx.fillRect(x, y, 40, 10);
             }
             
-            // 5. Trees (Behind grass logic or in front?)
-            // We draw trees at the specific ground Y
-            trees.forEach(tree => drawTree(tree, groundY));
-
-            // 6. Grass
-            ctx.fillStyle = theme.grass;
-            ctx.fillRect(0, groundY, canvas.width, grassHeight);
+            // 5. DRAW SCENE (Delegated)
+            
+            // Pass control to the specific scene renderer
+            sceneConfig[currentScene].draw(ctx, groundY, theme);
             
             // 7. WEATHER PARTICLES (RAIN/SNOW)
             if (weather.isRaining || weather.isSnowing) {
@@ -323,6 +419,10 @@ document.getElementById('search-btn').addEventListener('click', () => {
 });
 document.getElementById('city-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') searchCity(e.target.value);
+});
+document.getElementById('scene-select').addEventListener('change', (e) => {
+    currentScene = e.target.value;
+    resize(); // Trigger regeneration of objects (stars/buildings)
 });
 
 // --- SHARE BUTTON LOGIC ---
@@ -375,7 +475,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
         textArea.select();
         
         try {
-            document.execCommand('copy');
+            document.execCommand('copy'); 
         } catch (e) {
             alert("Could not copy link automatically. Please copy from the address bar.");
             document.body.removeChild(textArea);

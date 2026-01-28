@@ -68,6 +68,21 @@ button:hover {
     background: rgba(0, 0, 0, 0.8);
 }
 
+#scene-select {
+    background: #333;
+    color: white;
+    border: 2px solid #777;
+    padding: 8px;
+    font-family: 'Courier New', monospace;
+    margin-left: 5px;
+    outline: none;
+    cursor: pointer;
+}
+
+#scene-select:hover {
+    background: #444;
+}
+
 .hidden {
     display: none !important;
 }
