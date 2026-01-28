@@ -41,10 +41,64 @@ button:hover {
     position: absolute;
     top: 20px;
     left: 20px;
-    z-index: 10; /* Keeps UI above the canvas */
+    z-index: 10;
     font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.nav-bar {
+    display: flex;
+    gap: 8px; /* Space between buttons */
+    align-items: center;
+}
+/* --- UNIFIED RETRO UI STYLE --- */
+/* This class applies to the gear, link, AND dropdown to make them identical */
+.retro-ui {
+    background: rgba(0, 0, 0, 0.6); /* Semi-transparent dark glass */
+    color: #e0e0e0;
+    border: 2px solid #555;
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    cursor: pointer;
+    outline: none;
+    border-radius: 4px; /* Slight rounding, optional */
+    backdrop-filter: blur(2px); /* Blurs the pixels behind the button slightly */
+    transition: all 0.2s ease;
+    height: 40px; /* Force same height for alignment */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
+.retro-ui:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: #888;
+    color: white;
+}
+
+/* --- DROPDOWN SPECIFIC HACKS --- */
+#scene-select {
+    /* This strips the ugly default OS arrow and background */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    
+    padding-right: 30px; /* Make room for custom arrow */
+    
+    /* Add a custom white arrow SVG as a background image */
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px;
+}
+
+/* Specific fix for dropdown options background (browsers force this white usually) */
+#scene-select option {
+    background: #222;
+    color: white;
+}
 #menu-toggle {
     background: rgba(0, 0, 0, 0.5);
     color: white;
@@ -68,20 +122,7 @@ button:hover {
     background: rgba(0, 0, 0, 0.8);
 }
 
-#scene-select {
-    background: #333;
-    color: white;
-    border: 2px solid #777;
-    padding: 8px;
-    font-family: 'Courier New', monospace;
-    margin-left: 5px;
-    outline: none;
-    cursor: pointer;
-}
 
-#scene-select:hover {
-    background: #444;
-}
 
 .hidden {
     display: none !important;

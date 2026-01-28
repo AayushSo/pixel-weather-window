@@ -34,7 +34,7 @@ const sceneConfig = {
         init: () => {
             // Generate Skyline (Random Buildings)
             sceneObjects = [];
-            let x = 0;
+            let x = canvas.width/2;
             while (x < canvas.width) {
                 const w = 20 + Math.random() * 30;
                 const h = 30 + Math.random() * 50;
@@ -305,9 +305,9 @@ function draw() {
         then = now - (elapsed % fpsInterval);
 
         // DYNAMIC SIZING CALCULATIONS
-        const grassHeight = canvas.height * 0.15; // Grass is 15% of screen
-        const groundY = canvas.height - grassHeight;
-        
+        const groundHeight = canvas.height * sceneConfig[currentScene].groundHeight;
+        const groundY = canvas.height - groundHeight;
+            
         // Sun Size: 5% of width, but capped between 8px and 30px
         const sunSize = Math.max(8, Math.min(canvas.width * 0.05, 30));
 
@@ -336,8 +336,6 @@ function draw() {
 
             // 3. Sun/Moon Arc
             // Draw only if Sky is Clear (Not Overcast)
-            const groundHeight = canvas.height * sceneConfig[currentScene].groundHeight;
-            const groundY = canvas.height - groundHeight;
             
             if (!theme.overcast) {
                 // We use relative radius based on screen width

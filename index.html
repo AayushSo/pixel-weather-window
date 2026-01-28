@@ -6,18 +6,24 @@
 </head>
 <body>
 <div class="ui-container">
-    <button id="menu-toggle">⚙️</button>
-    <button id="share-btn" title="Share this view">🔗</button>
+    <div class="nav-bar">
+        <button id="menu-toggle" class="retro-ui">⚙️</button>
+        <button id="share-btn" class="retro-ui">🔗</button>
+        
+        <div class="select-wrapper">
+            <select id="scene-select" class="retro-ui">
+                <option value="pasture">Pasture</option>
+                <option value="city">City</option>
+                <option value="beach">Beach</option>
+            </select>
+        </div>
+    </div>
+
     <div id="search-box" class="hidden">
         <input type="text" id="city-input" placeholder="Enter city name...">
         <button id="search-btn">Search</button>
         <div id="status-msg"></div>
     </div>
-        <select id="scene-select">
-        <option value="pasture">Pasture</option>
-        <option value="city">City</option>
-        <option value="beach">Beach</option>
-    </select>
 </div>
     <canvas id="pixel-canvas" width="300" height="200"></canvas>
     
