@@ -27,7 +27,17 @@ let then = Date.now();
 // --- STARS & TREES SETUP ---
 let stars = [];
 let trees = []; // New: Array to hold tree positions
+const particles = [];
 
+// Create 100 particles for reuse
+for(let i=0; i<100; i++) {
+    particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        speed: 2 + Math.random() * 3, // Random fall speed
+        wobble: Math.random() * Math.PI * 2
+    });
+}
 function initStars() {
     stars = [];
     // Grass is always bottom 15% of screen
@@ -111,12 +121,23 @@ function getSkyTheme() {
     const end = themes[i + 1];
     const factor = (hour - start.hr) / (end.hr - start.hr);
 
-    return {
+    let theme = {
         sky: lerpColor(start.sky, end.sky, factor),
         grass: lerpColor(start.grass, end.grass, factor),
         sunVisible: start.sun,
         hour: hour
     };
+    // --- OVERCAST OVERRIDE ---
+    theme.overcast = false; // Default to clear skies
+    // --- OVERCAST OVERRIDE ---
+    if (weather.isRaining || weather.isSnowing) {
+        theme.sky = "#4a525a";      // Slate Grey Sky
+        theme.grass = "#1e2b1e";    // Darker/Wet Grass
+        theme.overcast = true;      // New Flag: It's cloudy!
+        // REMOVED: theme.sunVisible = false; <--- This was causing the bug
+    }
+
+    return theme;
 }
 // --- 2. SEARCH & WEATHER ---
 
@@ -160,12 +181,19 @@ async function searchCity(name) {
 }
 
 async function fetchWeather(lat, lon) {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=cloud_cover,wind_speed_10m&timezone=auto`);
+    // Added 'weather_code' to the requested parameters
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=cloud_cover,wind_speed_10m,weather_code&timezone=auto`);
     const data = await res.json();
+    
+    const code = data.current.weather_code;
+
     weather = { 
         clouds: data.current.cloud_cover, 
         windSpeed: data.current.wind_speed_10m, 
         timezoneOffset: data.utc_offset_seconds,
+        // WMO Codes: 51-67 (Rain), 71-77 (Snow), 80-82 (Showers), 85-86 (Snow Showers), 95+ (Thunderstorm)
+        isRaining: (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95),
+        isSnowing: (code >= 71 && code <= 77) || (code >= 85 && code <= 86),
         loaded: true 
     };
 }
@@ -195,11 +223,13 @@ function draw() {
             ctx.fillStyle = theme.sky;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // ... inside draw(), replace sections 2 and 3 with this:
+
             // 2. Stars (behind everything)
-            if (!theme.sunVisible) {
+            // Draw only if it is Night AND NOT Overcast
+            if (!theme.sunVisible && !theme.overcast) {
                 ctx.fillStyle = "white";
                 stars.forEach((star, index) => {
-                     // Check if star is above ground
                     if(star.y < groundY) { 
                         if ((Math.sin(Date.now() * 0.001 + index) > -0.5)) {
                             ctx.fillRect(star.x, star.y, star.size, star.size);
@@ -209,20 +239,24 @@ function draw() {
             }
 
             // 3. Sun/Moon Arc
-            // We use relative radius based on screen width
-            const arcRadiusX = canvas.width * 0.4;
-            const arcRadiusY = canvas.height * 0.5;
+            // Draw only if Sky is Clear (Not Overcast)
+            if (!theme.overcast) {
+                // We use relative radius based on screen width
+                const arcRadiusX = canvas.width * 0.4;
+                const arcRadiusY = canvas.height * 0.5;
 
-            let shiftedHour = (theme.hour - 6);
-            if (shiftedHour < 0) shiftedHour += 24;
-            const cycleHour = shiftedHour % 12;
-            const angle = (cycleHour / 12) * Math.PI;
+                let shiftedHour = (theme.hour - 6);
+                if (shiftedHour < 0) shiftedHour += 24;
+                const cycleHour = shiftedHour % 12;
+                const angle = (cycleHour / 12) * Math.PI;
 
-            const sunX = (canvas.width / 2) - Math.cos(angle) * arcRadiusX;
-            const sunY = groundY - Math.sin(angle) * arcRadiusY; 
+                const sunX = (canvas.width / 2) - Math.cos(angle) * arcRadiusX;
+                const sunY = groundY - Math.sin(angle) * arcRadiusY; 
 
-            ctx.fillStyle = theme.sunVisible ? "#FFD700" : "#F0EAD6";
-            ctx.fillRect(sunX, sunY, sunSize, sunSize); // Uses dynamic size
+                // If sunVisible is true (Day), draw Gold Sun. If false (Night), draw Pale Moon.
+                ctx.fillStyle = theme.sunVisible ? "#FFD700" : "#F0EAD6";
+                ctx.fillRect(sunX, sunY, sunSize, sunSize); 
+            }
 
             // 4. Clouds
             ctx.fillStyle = "rgba(255,255,255,0.4)";
@@ -242,6 +276,37 @@ function draw() {
             ctx.fillStyle = theme.grass;
             ctx.fillRect(0, groundY, canvas.width, grassHeight);
             
+            // 7. WEATHER PARTICLES (RAIN/SNOW)
+            if (weather.isRaining || weather.isSnowing) {
+                ctx.lineWidth = 1;
+                
+                particles.forEach(p => {
+                    if (weather.isRaining) {
+                        // Rain: Fast, blue, slanted lines
+                        ctx.strokeStyle = "rgba(170, 190, 220, 0.6)";
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p.x - 1, p.y + 4); // Slant left
+                        ctx.stroke();
+                        p.y += p.speed * 1.5; // Rain falls fast
+                    } else if (weather.isSnowing) {
+                        // Snow: Slow, white, wobbling pixels
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                        // Math.sin creates the gentle left-right wobble
+                        let wobbleX = p.x + Math.sin(Date.now() * 0.002 + p.wobble) * 3;
+                        ctx.fillRect(wobbleX, p.y, 2, 2);
+                        p.y += p.speed * 0.3; // Snow falls slow
+                    }
+
+                    // Loop particles when they hit the bottom
+                    if (p.y > canvas.height) {
+                        p.y = -5;
+                        p.x = Math.random() * canvas.width;
+                    }
+                });
+            }
+            console.log("Local Hour at City:", theme.hour.toFixed(2),`and ${weather.windSpeed}km/h wind.` );
+            //console.log(`Drawn with ${cloudCover}% clouds and ${windSpeed}km/h wind.`);
         } else {
             // Loading Screen
             ctx.fillStyle = "#111";
