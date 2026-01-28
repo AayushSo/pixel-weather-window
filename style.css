@@ -1,0 +1,78 @@
+body {
+    background-color: #222; /* Dark background for the webpage */
+    display: flex;
+    justify-content: center; /* Center horizontally */
+    align-items: center;     /* Center vertically */
+    height: 100vh;           /* Full viewport height */
+    margin: 0;
+}
+
+canvas {
+    /* Scale the tiny 300x200 canvas up to look "pixelated" */
+    width: 900px;  
+    image-rendering: pixelated; /* Crucial! Keeps pixels sharp, not blurry */
+    border: 4px solid #444;     /* A simple window frame */
+}
+
+.controls {
+    margin-bottom: 20px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+input {
+    background: #333;
+    border: 2px solid #555;
+    color: white;
+    padding: 10px;
+    outline: none;
+}
+
+button {
+    background: #555;
+    color: white;
+    border: 2px solid #777;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #777;
+}
+
+.ui-container {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10; /* Keeps UI above the canvas */
+    font-family: 'Courier New', monospace;
+}
+
+#menu-toggle {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: 1px solid #555;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#search-box {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    margin-top: 10px;
+    border: 2px solid #555;
+}
+
+#status-msg {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #4df06a; /* Success green */
+}
+
+.error-text {
+    color: #ff4d4d !important; /* Failure red */
+}
