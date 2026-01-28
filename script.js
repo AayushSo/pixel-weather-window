@@ -464,64 +464,54 @@ document.getElementById('scene-select').addEventListener('change', (e) => {
 
 // --- SHARE BUTTON LOGIC ---
 document.getElementById('share-btn').addEventListener('click', async () => {
-    // 1. Get the current city name if available
+    // 1. Get current state
     const statusText = document.getElementById('status-msg').innerText;
+    
+    // Create a base URL object (cleans up any old messy params)
+    const shareUrl = new URL(window.location.origin + window.location.pathname);
+    
+    // Add the SCENE to the URL
+    shareUrl.searchParams.set('scene', currentScene);
+
     let shareText = "Check out this Pixel Weather Window!";
     
-    // If we have a city loaded, use it
+    // Add the CITY to the URL (if one is loaded)
     if (statusText.includes("Success:")) {
-        const city = statusText.replace("Success: ", "");
-        shareText = `Check out the current weather in ${city} in pixel art!`;
+        const city = statusText.replace("Success: ", "").trim();
+        shareUrl.searchParams.set('city', city);
+        shareText = `Check out the weather in ${city} (Pixel ${currentScene} view)!`;
     }
 
     const shareData = {
         title: 'Pixel Weather Window',
         text: shareText,
-        url: window.location.href
+        url: shareUrl.toString() // e.g. ".../?scene=beach&city=London"
     };
 
-    // 2. Try native Share (Mobile/Tablets)
+    // 2. Share or Copy (Same logic as before, just using shareUrl.toString())
     if (navigator.share) {
         try {
             await navigator.share(shareData);
-            return; // If share works, stop here
-        } catch (err) {
-            console.log('Share canceled or failed, trying clipboard...', err);
-            // If share fails, fall through to clipboard logic below
-        }
+            return;
+        } catch (err) { console.log('Share canceled'); }
     }
 
-    // 3. Clipboard Logic (Desktop/Fallback)
     try {
-        // Method A: Modern API (Requires HTTPS)
         if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(window.location.href);
-        } else {
-            throw new Error("Clipboard API unavailable");
-        }
+            await navigator.clipboard.writeText(shareUrl.toString());
+        } else { throw new Error("Clipboard unavailable"); }
     } catch (err) {
-        // Method B: Legacy Fallback (Works on HTTP/Older browsers)
+        // Fallback for HTTP/Older Browsers
         const textArea = document.createElement("textarea");
-        textArea.value = window.location.href;
-        
-        // Ensure it's not visible but part of the DOM
-        textArea.style.position = "fixed"; 
-        textArea.style.left = "-9999px";
+        textArea.value = shareUrl.toString();
+        textArea.style.position = "fixed"; textArea.style.left = "-9999px";
         document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {
-            document.execCommand('copy'); 
-        } catch (e) {
-            alert("Could not copy link automatically. Please copy from the address bar.");
-            document.body.removeChild(textArea);
-            return;
-        }
+        textArea.focus(); textArea.select();
+        try { document.execCommand('copy'); } catch (e) { alert("Manually copy URL"); }
         document.body.removeChild(textArea);
     }
 
-    // 4. Visual Feedback (Show ✅)
+    // Visual Feedback
     const btn = document.getElementById('share-btn');
     const originalText = btn.innerText;
     btn.innerText = "✅";
@@ -529,12 +519,39 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 });
 
 // START
-// FORCE UI SYNC: Ensure the dropdown matches the default 'pasture' variable
-document.getElementById('scene-select').value = currentScene;
-resize(); // Call resize immediately to set initial vars
-if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(p => fetchWeather(p.coords.latitude, p.coords.longitude), 
-    () => fetchWeather(51.5, -0.11));
-} else { fetchWeather(51.5, -0.11); }
+
+// 1. Check for URL Parameters (Shared Links)
+const urlParams = new URLSearchParams(window.location.search);
+const sharedScene = urlParams.get('scene');
+const sharedCity = urlParams.get('city');
+
+// 2. Apply Shared Scene (if exists)
+if (sharedScene && sceneConfig[sharedScene]) {
+    currentScene = sharedScene;
+}
+
+// 3. Sync UI (Force dropdown to match currentScene)
+const sceneSelect = document.getElementById('scene-select');
+if (sceneSelect) sceneSelect.value = currentScene;
+
+// 4. Initialize Canvas
+resize(); 
+
+// 5. Load Weather
+if (sharedCity) {
+    // A. If user clicked a shared link, load that city immediately
+    // Decode URI component handles spaces (e.g. "New%20York" -> "New York")
+    searchCity(decodeURIComponent(sharedCity));
+} else {
+    // B. Otherwise, use Geolocation (Default behavior)
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            p => fetchWeather(p.coords.latitude, p.coords.longitude), 
+            () => fetchWeather(51.5, -0.11) // Fallback to London if denied
+        );
+    } else { 
+        fetchWeather(51.5, -0.11); 
+    }
+}
 
 draw();
