@@ -54,6 +54,20 @@ button:hover {
     font-size: 18px;
 }
 
+#share-btn {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: 1px solid #555;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    margin-left: 5px; /* Spacing between gear and link */
+}
+
+#share-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
 .hidden {
     display: none !important;
 }

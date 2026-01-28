@@ -325,6 +325,46 @@ document.getElementById('city-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') searchCity(e.target.value);
 });
 
+// --- SHARE BUTTON LOGIC ---
+document.getElementById('share-btn').addEventListener('click', async () => {
+    // 1. Get the current city name if available
+    const statusText = document.getElementById('status-msg').innerText;
+    let shareText = "Check out this Pixel Weather Window!";
+    
+    // If we have a city loaded (e.g., "Success: Tokyo, JP"), use it
+    if (statusText.includes("Success:")) {
+        const city = statusText.replace("Success: ", "");
+        shareText = `Check out the current weather in ${city} in pixel art!`;
+    }
+
+    const shareData = {
+        title: 'Pixel Weather Window',
+        text: shareText,
+        url: window.location.href // The link to your GitHub page
+    };
+
+    // 2. Try to use the native "Share" menu (Mobile/Modern Browsers)
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+        } catch (err) {
+            console.log('Share canceled:', err);
+        }
+    } else {
+        // 3. Fallback for Desktop: Copy URL to clipboard
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            // Temporarily change button text to show success
+            const btn = document.getElementById('share-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "✅";
+            setTimeout(() => btn.innerText = originalText, 2000);
+        } catch (err) {
+            alert("Could not copy link. Manually copy the URL from the bar!");
+        }
+    }
+});
+
 // START
 resize(); // Call resize immediately to set initial vars
 if (navigator.geolocation) {
