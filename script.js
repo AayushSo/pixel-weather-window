@@ -231,13 +231,13 @@ function getSkyTheme() {
     // so they don't fade continuously.
     const themes = [
         { hr: 0,   sky: "#05050a", sun: false }, // Midnight (Dark)
-        { hr: 5,   sky: "#05050a", sun: false }, // 5 AM (Still Dark - No change since midnight)
+        { hr: 5,   sky: "#360f5a", sun: false }, // 5 AM (Still Dark - No change since midnight)
         { hr: 6,   sky: "#ff7e5f", sun: true },  // 6 AM (Sunrise - Orange)
         { hr: 7,   sky: "#87ceeb", sun: true },  // 7 AM (Day Blue - Rapid fade from Orange)
         { hr: 12,  sky: "#87ceeb", sun: true },  // Noon (Day Blue - No change since 7 AM)
         { hr: 17,  sky: "#87ceeb", sun: true },  // 5 PM (Day Blue - Start of sunset soon)
-        { hr: 18,  sky: "#feb47b", sun: true },  // 6 PM (Sunset - Orange)
-        { hr: 19,  sky: "#05050a", sun: false }, // 7 PM (Night - Rapid fade to Dark)
+        { hr: 18,  sky: "#feb47b", sun: false },  // 6 PM (Sunset - Orange)
+        { hr: 19,  sky: "#360f5a", sun: false }, // 7 PM (Night - Rapid fade to Dark)
         { hr: 24,  sky: "#05050a", sun: false }  // Midnight (Dark)
     ];
 
