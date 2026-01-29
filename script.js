@@ -12,7 +12,7 @@ let sceneObjects = []; // Will hold trees, buildings, etc.
 const sceneConfig = {
     pasture: {
         groundHeight: 0.15, // 15% of screen
-        colors: { day: "#228b22", night: "#050d05" },
+        colors: { day: "#228b22", night: "#051a05" },
         init: () => {
             // Generate Trees
             sceneObjects = [
@@ -45,7 +45,7 @@ const sceneConfig = {
         draw: (ctx, groundY, theme) => {
             // 1. Draw Buildings (Silhouettes)
             // Day: Dark Grey | Night: Black
-            const bldgColor = theme.sunVisible ? "#2a2a2a" : "#050505";
+            const bldgColor = theme.sunVisible ? "#2a2a2a" : "#2a2a2a";
             
             sceneObjects.forEach(b => {
                 ctx.fillStyle = bldgColor;
@@ -226,11 +226,9 @@ function getSkyTheme() {
     const localTime = new Date(utcTimestamp + (weather.timezoneOffset * 1000));
     const hour = localTime.getHours() + localTime.getMinutes() / 60;
 
-    // --- EXPANDED THEMES ARRAY ---
-    // We add "guard rows" (e.g., 5.0 and 7.0) to lock colors in place
-    // so they don't fade continuously.
     const themes = [
         { hr: 0,   sky: "#05050a", sun: false }, // Midnight (Dark)
+        { hr: 4,   sky: "#05050a", sun: false }, // Midnight (Dark)
         { hr: 5,   sky: "#360f5a", sun: false }, // 5 AM (Still Dark - No change since midnight)
         { hr: 6,   sky: "#ff7e5f", sun: true },  // 6 AM (Sunrise - Orange)
         { hr: 7,   sky: "#87ceeb", sun: true },  // 7 AM (Day Blue - Rapid fade from Orange)
@@ -238,26 +236,26 @@ function getSkyTheme() {
         { hr: 17,  sky: "#87ceeb", sun: true },  // 5 PM (Day Blue - Start of sunset soon)
         { hr: 18,  sky: "#feb47b", sun: false },  // 6 PM (Sunset - Orange)
         { hr: 19,  sky: "#360f5a", sun: false }, // 7 PM (Night - Rapid fade to Dark)
+        { hr: 20,  sky: "#05050a", sun: false }, // 7 PM (Night - Rapid fade to Dark)
         { hr: 24,  sky: "#05050a", sun: false }  // Midnight (Dark)
     ];
 
-    // Find the correct time slot
     let i = 0;
     while (i < themes.length - 1 && hour > themes[i + 1].hr) i++;
     const start = themes[i];
     const end = themes[i + 1];
-    
-    // Calculate progress between these two specific timestamps
     const factor = (hour - start.hr) / (end.hr - start.hr);
 
-    // 1. GET CURRENT SCENE DATA
+    // SCENE COLORS
     const sceneColors = sceneConfig[currentScene].colors;
 
     let theme = {
-        sky: lerpColor(start.sky, end.sky, factor),
+        // --- CHANGE 1: Return Raw Colors + Mix Factor ---
+        skyStart: start.sky,
+        skyEnd: end.sky,
+        mixFactor: factor,
         
-        // 2. DYNAMIC GROUND COLOR
-        // Use Day color if sun is visible, otherwise Night color
+        // Ground still uses simple switch (or you can apply banding to ground too!)
         ground: start.sun ? sceneColors.day : sceneColors.night,
         
         sunVisible: start.sun,
@@ -265,11 +263,13 @@ function getSkyTheme() {
         overcast: false
     };
 
-    // 3. WEATHER OVERRIDES
     if (weather.isRaining || weather.isSnowing) {
-        theme.sky = "#4a525a";      // Slate Grey Sky
-        theme.ground = sceneColors.night; // Wet/Dark ground
-        theme.overcast = true;      // Hide sun/moon
+        // For rain, we override start/end to be the same "Grey"
+        // This effectively disables the banding animation
+        theme.skyStart = "#4a525a";
+        theme.skyEnd = "#4a525a"; 
+        theme.ground = sceneColors.night; 
+        theme.overcast = true;      
     }
 
     return theme;
@@ -354,10 +354,55 @@ function draw() {
         const theme = getSkyTheme();
 
         if (weather.loaded) {
-            // 1. Sky
-            ctx.fillStyle = theme.sky;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // 1. DYNAMIC BANDED SKY WITH TEXTURE
+            for (let y = 0; y < canvas.height; y++) {
+                
+                // A. Normalize Y & Band Noise (Same as before)
+                const nY = y / canvas.height; 
+                const bandNoise = Math.sin(y * 0.8 + 923.1); 
 
+                // B. Calculate Threshold (Same direction logic)
+                let threshold = 0;
+                if (theme.hour < 12) {
+                    threshold = (1 - nY) - (bandNoise * 0.2); // Rising: Bottom-up
+                } else {
+                    threshold = nY - (bandNoise * 0.2);       // Setting: Top-down
+                }
+
+                // C. Determine Main Color
+                // We calculate the "distance" to the transition to know how "mixed" this area is
+                const dist = theme.mixFactor - threshold;
+                const isEndColor = dist > 0;
+
+                // Draw the Main Line
+                ctx.fillStyle = isEndColor ? theme.skyEnd : theme.skyStart;
+                ctx.fillRect(0, y, canvas.width, 1);
+
+                // D. THE TEXTURE PASS (New!)
+                // Only add dots if we are near the "battle line" between colors.
+                // If dist is huge, it means we are deep in the solid color (no texture needed).
+                if (Math.abs(dist) < 0.2) { 
+                    
+                    // Pick the "Opposite" color for the dots
+                    ctx.fillStyle = isEndColor ? theme.skyStart : theme.skyEnd;
+                    
+                    // We skip pixels (x += 2) to create a checkerboard/dither pattern
+                    // We shift the start (y % 2) to stagger the dots on alternate rows
+                    for (let x = (y % 2) * 2; x < canvas.width; x += 4) {
+                        
+                        // Stable Randomness for the Dot
+                        // We use a high multiplier for X to make it look like static noise
+                        const dotNoise = Math.sin(x * 12.9898 + y * 78.233);
+                        
+                        // If the noise hits, draw a 1px dot
+                        if (dotNoise > 0.5) {
+                            ctx.fillRect(x, y, 1, 1);
+                        }
+                    }
+                }
+            }
+
+            // 2. Stars (behind everything) ...
             // ... inside draw(), replace sections 2 and 3 with this:
 
             // 2. Stars (behind everything)
